@@ -3,14 +3,14 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const sequelize = require('./database/db');
-const userRoute = require('./routes/userRoute')
-const productRoute = require('./routes/productRoute')
-
+const userRoute = require('./routes/userRoute');
+const inventoryRoute = require('./routes/inventoryRoute');
+const bloodRequestRoutes = require("./routes/bloodRequestRoutes");
 //Creating a Server
 const app = express();
 
 //Creating a port
-const PORT = process.env.PORT || 5000
+const PORT = process.env.PORT || 8080
 
 //Creating a middleware
 app.use(cors());
@@ -24,7 +24,9 @@ app.get('/login',(req, res)=>{
 
 
 app.use('/users', userRoute);
-app.use('/products', productRoute);
+app.use('/inventory', inventoryRoute);
+app.use('/bloodRequest', bloodRequestRoutes);
+
 
 
 //Running on PORT

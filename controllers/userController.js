@@ -1,132 +1,105 @@
-const User = require('../model/User')
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcrypt');
+const User = require("../model/User");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
 
-const registerUser = async(req, res)=>{
-    const {username, password} = req.body;
-    //validate username and password
-    if(!username || !password){
-        return res.status(400).json({
-            error: "Please Insert username and password"
-        })
+const SECRET_KEY = "ASDFGHJKLAHVJVF3546523642635"; 
+
+// **REGISTER USER**
+exports.register = async (req, res) => {
+  try {
+    const { Name, Email, Phone, Address, Password, BloodType, Role } = req.body;
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ where: { Email } });
+    if (existingUser) return res.status(400).json({ error: "Email already exists" });
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(Password, 10);
+
+    // Create new user
+    const newUser = await User.create({
+      Name,
+      Email,
+      Phone,
+      Address,
+      Password: hashedPassword,
+      BloodType,
+      Role,
+    });
+
+    res.status(201).json({ message: "User registered successfully", user: newUser });
+  } catch (error) {
+    res.status(500).json({ error: "Registration failed", details: error.message });
+  }
+};
+
+exports.login = async (req, res) => {
+    try {
+      const { Email, Password } = req.body;
+  
+      // Check if user exists
+      const user = await User.findOne({ where: { Email } });
+      if (!user) return res.status(401).json({ error: "Invalid email or password" });
+  
+      // Validate password
+      const validPassword = await bcrypt.compare(Password, user.Password);
+      if (!validPassword) return res.status(401).json({ error: "Invalid email or password" });
+  
+      // Generate JWT Token
+      const token = jwt.sign({ id: user.id, Role: user.Role }, SECRET_KEY, { expiresIn: "1h" });
+  
+      // Determine Redirect URL
+      const redirectUrl = user.Role === "Admin" ? "/admin/dashboard" : "/user/dashboard";
+  
+      res.json({
+        message: "Login successful",
+        token,
+        role: user.Role,
+        redirect: redirectUrl, // Send the redirect URL
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Login failed", details: error.message });
     }
-    try{
-        const checkExistingUser = await User.findOne({where: {username}})
-        if(checkExistingUser){
-        
-            return res.status(400).json({
-                error: "New user required"
-            })
-           
-        }
-        const saltRound = 10;
-        const hashpassword = await bcrypt.hash(password, saltRound)
+  };
+  // **GET USER PROFILE (PROTECTED)**
+exports.getProfile = async (req, res) => {
+  try {
+    const user = await User.findByPk(req.user.id, {
+      attributes: { exclude: ["Password"] },
+    });
+    if (!user) return res.status(404).json({ error: "User not found" });
 
-        const newUser = await User.create({username, password: hashpassword});
-        res.status(200).json({message: "Registartion Successful....."});
+    res.json({ message: "User profile retrieved", user });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to retrieve profile", details: error.message });
+  }
+};
 
-    }
-    catch(error){
-        console.log(error)
-        res.status(500).json({error: "Something went Wrong"});
-    }
+// **UPDATE USER PROFILE**
+exports.updateProfile = async (req, res) => {
+  try {
+    const { Name, Phone, Address, BloodType } = req.body;
 
-}
+    const user = await User.findByPk(req.user.id);
+    if (!user) return res.status(404).json({ error: "User not found" });
 
-const loginUser = async(req, res) =>{
-    const {username, password} = req.body;
-     //validate username and password
-    if(!username || !password){
-        return res.status(400).json({
-            error: "Please Insert username and password"
-        })
-    }
-    try{
-        const user = await User.findOne({where: {username}})
-        if(!user){
-            return res.status(400).json({
-                error: "New user required"
-            })
-        }
-        const isMatch = await bcrypt.compare(password, user.password)
-        if(!isMatch){
-            return res.status(400).json({
-                error: "Insert proper password!!!!"
-            })
-        }
-        const token = jwt.sign(
-            {id: user.username, username: user.username},
-            process.env.JWT_SECRET || 'FVHJAFJHSFVBSFBSSFJSF',
-            {expiresIn: '24h'}
+    await user.update({ Name, Phone, Address, BloodType });
 
-        )
-        res.status(200).json({message: "Successfully Logged in", token},
-            
+    res.json({ message: "Profile updated successfully", user });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update profile", details: error.message });
+  }
+};
 
-        )
-    }
-    catch(error){
-        res.status(500).json({error: "Something went Wrong"});
-        console.log(error)
-    
-    }
+// **DELETE USER**
+exports.deleteUser = async (req, res) => {
+  try {
+    const user = await User.findByPk(req.params.id);
+    if (!user) return res.status(404).json({ error: "User not found" });
 
-}
-// const getUser = async(req, res)=>{
-
-//     try{
-//         const tests = await User.findAll();
-//         res.status(200).json(tests);
-
-//     }
-//     catch(error){
-//         res.status(500).json({error: "Failed to Load"})
-//     }
-// }
-
-// const createUser = async(req, res)=>{
-    
-//     try{
-        
-// const {username, password} = req.body;
-
-// //Hash the password
-// const newtest = await User.create({username, password})
-
-// res.status(200).json(newtest);
-//     }
-//     catch(error){
-//         res.status(500).json({error: "Failed to Load"})
-//         console.log(error)
-//     }
-
-// }
-
-// const updateUser = async(req, res)=>{
-//     try {
-//         const user = await User.findByPk(req.params.id);
-//         if (!user) {
-//             return res.status(404).json({ message: 'User not found' });
-//         }
-//         await user.update(req.body);
-//         res.json(user);
-//     } catch (err) {
-//         res.status(400).json({ error: err.message });
-//     }
-// }
-
-// const deleteUser = async(req, res)=>{
-//     try {
-//         const user = await User.findByPk(req.params.id);
-//         if (!user) {
-//             return res.status(404).json({ message: 'User not found' });
-//         }
-//         await user.destroy();
-//         res.json({ message: 'User deleted' });
-//     } catch (err) {
-//         res.status(500).json({ error: err.message });
-//     }
-// }
-
-// module.exports = {createUser, getUser, deleteUser, updateUser}
-module.exports = {registerUser, loginUser}
+    await user.destroy();
+    res.json({ message: "User deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to delete user", details: error.message });
+  }
+};
